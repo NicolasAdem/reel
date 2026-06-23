@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+# Published on PyPI as "reel-sync" (plain "reel" was taken). Friends install with
+# `pip install reel-sync`; the import package and the command both stay `reel`.
+[project]
+name = "reel-sync"
+dynamic = ["version"]          # single-sourced from reel/__init__.py
+description = "Plug in any USB drive, SD card or voice recorder — it's copied to your PC. Fully local, always on."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [{ name = "Nicolas" }]
+keywords = ["usb", "backup", "copy", "sd-card", "voice-recorder", "icd-ux570", "sync"]
+dependencies = [
+    "rich>=13.0",
+    "mutagen>=1.47",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.urls]
+Homepage = "https://pypi.org/project/reel-sync/"
+
+[project.scripts]
+reel = "reel.__main__:main"
+
+[tool.setuptools]
+packages = ["reel"]
+py-modules = []
+
+[tool.setuptools.dynamic]
+version = { attr = "reel.__version__" }

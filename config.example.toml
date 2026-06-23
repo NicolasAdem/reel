@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  reel config — entirely optional. Copy to config.toml only to change a default.
+#  With no config file, reel copies into a 'reel' folder in your Documents and
+#  follows it if you ever move it. (Windows paths use / not \.)
+# ─────────────────────────────────────────────────────────────────────────
+
+# [library]
+# By default the library is a 'reel' folder in Documents, and reel follows it if
+# you move it. Uncomment to PIN a fixed path instead (this turns off auto-follow).
+# sync_root = "D:/MyBackups/reel"
+
+[device]
+labels = ["IC RECORDER", "MEMORY CARD", "IC RECORDER MEMORY CARD"]
+delete_after_sync = false                    # copy off the recorder, never wipe it
+
+[watch]
+interval_sec = 4                             # how often auto-copy looks for a drive
+close_on_unplug = true                       # close the pop-up window when you unplug
+
+[ui]
+theme = "light"                              # "light" (default) or "dark"
