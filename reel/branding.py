@@ -7,7 +7,9 @@ Colours are chosen to read on a WHITE terminal first; dark just brightens them.
 """
 
 NAME = "reel"
-VERSION = "3.5.0"
+# Single-sourced from reel/__init__.py so the logo never drifts from the real
+# version. (__init__ only defines __version__, so there's no import cycle.)
+from . import __version__ as VERSION  # noqa: E402
 TAGLINE = "plug it in, copied"
 
 # A small, tasteful lowercase wordmark. Printed once at the top of a run.
