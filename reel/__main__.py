@@ -15,6 +15,9 @@ __main__.py — the reel command line. Three commands; the rest is automatic.
                              reel find what was my first recording about?
                              reel find the interview at Bucky's about a month ago
                            Uses Claude Code if installed; no words → it prompts you.
+                           Each answer ends with clickable links — click one to play.
+  reel play [N]            play a recording from your last `reel find` (N = its
+                           number in that list, default 1) in your media player.
   reel upgrade             update reel to the latest version (also: reel --upgrade).
   reel --version           print the version and exit.
 
@@ -49,6 +52,8 @@ def build_parser():
     pr.add_argument("state", nargs="?", choices=["on", "off"])
     pf = sub.add_parser("find", parents=[common])
     pf.add_argument("query", nargs="*")
+    ppl = sub.add_parser("play", parents=[common])
+    ppl.add_argument("which", nargs="?")
     sub.add_parser("upgrade", parents=[common])
     pa = sub.add_parser("auto", parents=[common])     # internal: the watcher's own entry points
     pa.add_argument("action", nargs="?", choices=["run", "session", "restart"])
@@ -120,6 +125,11 @@ def main(argv=None):
         # No words → it prompts you. Falls back to keyword search if Claude is away.
         from .ask import run_ask
         run_ask(cfg, con, " ".join(getattr(args, "query", []) or []).strip() or None)
+
+    elif args.cmd == "play":
+        # Play a recording from the last find — no logo, just open it and go.
+        from .ask import run_play
+        run_play(cfg, con, getattr(args, "which", None))
 
     elif args.cmd == "upgrade":
         con.logo()

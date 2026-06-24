@@ -32,10 +32,12 @@ to a plain keyword search so `reel find` always does something.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -175,6 +177,11 @@ def _instruction(question: str, truncated: bool) -> str:
         "Quote the words that matter and give friendly dates. If nothing matches, say "
         "so kindly and mention what you do have nearby in time. Never invent anything "
         "that isn't in the recordings.\n\n"
+        "WRITE IN PLAIN TEXT ONLY. No Markdown of any kind: no asterisks, no **bold** "
+        "or *italics*, no backticks, no '#' headings, no '>' quote marks, and no bullet "
+        "characters ('-', '*', '•'). Just ordinary sentences. If you list items, number "
+        "them like '1.' and '2.' on their own lines. Put quotes in plain double quotes, "
+        "not in italics.\n\n"
         "FORMAT: after your answer, output one line for EACH recording you referenced "
         "or listed, in the order you mention them, exactly as 'FILE: <filename-stem>' "
         "— copying the stem verbatim from that recording's '###' header (no extension, "
@@ -271,30 +278,97 @@ def _resolve_stem(raw: str, by_stem: dict) -> tuple | None:
     return None
 
 
-def _print_file_link(con, rec: Path, when=None) -> None:
-    """Print one recording as a clickable link. Modern terminals (Windows Terminal,
-    iTerm, etc.) open it in the default media player on click. Links the audio file
-    when it's there; otherwise links its folder so you can still get to it."""
+_MD_BOLD = re.compile(r"\*\*([^*]+)\*\*")
+_MD_ITALIC = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
+_MD_UNDER = re.compile(r"__([^_]+)__")
+_MD_LINK = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+_MD_HEADING = re.compile(r"(?m)^\s{0,3}#{1,6}\s*")
+_MD_QUOTE = re.compile(r"(?m)^\s*>\s?")
+_MD_BULLET = re.compile(r"(?m)^\s*[-*•]\s+")
+_MD_FENCE = re.compile(r"```[a-zA-Z0-9]*\n?")
+
+
+def _strip_markdown(text: str) -> str:
+    """Reduce a model's answer to clean plain prose: no asterisks, bold, headings,
+    backticks, block quotes or bullet glyphs — just the words. (We also ask Claude
+    for plain text, but this guarantees it even when a stray marker slips through.)"""
+    t = _MD_FENCE.sub("", text).replace("`", "")
+    t = _MD_LINK.sub(r"\1", t)
+    t = _MD_BOLD.sub(r"\1", t)
+    t = _MD_UNDER.sub(r"\1", t)
+    t = _MD_ITALIC.sub(r"\1", t)
+    t = _MD_HEADING.sub("", t)
+    t = _MD_QUOTE.sub("", t)
+    t = _MD_BULLET.sub("", t)
+    t = t.replace("**", "").replace("__", "")
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
+
+
+def _open_media(path: Path) -> bool:
+    """Open a recording in the system's default player (so it just plays). On
+    Windows that's whatever handles .mp3 — on this machine, the Media Player app."""
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(path))         # noqa: S606 — intended: default player
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(path)], check=False)
+        else:
+            subprocess.run(["xdg-open", str(path)], check=False)
+        return True
+    except Exception:
+        return False
+
+
+def _last_find_path(cfg: Config) -> Path:
+    return Path(cfg.sync_root) / ".reel" / "last_find.json"
+
+
+def _save_last(cfg: Config, paths: list[Path]) -> None:
+    """Remember the recordings from the latest find, so `reel play N` can open one
+    even in a terminal where clicking the link isn't supported."""
+    try:
+        store = _last_find_path(cfg)
+        store.parent.mkdir(parents=True, exist_ok=True)
+        store.write_text(json.dumps([str(p) for p in paths]), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _print_file_link(con, rec: Path, when=None, index=None) -> None:
+    """Print one recording as a clickable, play-on-click link. The path is turned
+    into a properly percent-encoded file URI (so folders with spaces like 'IC
+    RECORDER' still open), and clicking it launches the default media player. Links
+    the audio file when present, otherwise its folder."""
     target = rec if rec.suffix else rec.parent
-    label = rec.name if rec.suffix else f"{rec.stem}  (folder)"
-    uri = "file:///" + str(target).replace("\\", "/")
+    label = rec.name if rec.suffix else f"{rec.stem} (folder)"
+    try:
+        uri = target.as_uri()               # correct %20 encoding for spaces etc.
+    except Exception:
+        uri = "file:///" + str(target).replace("\\", "/")
+    num = f"[muted]{index}.[/muted] " if index else ""
     date = f"   [muted]{when:%Y-%m-%d %H:%M}[/muted]" if when else ""
     try:
-        con.c.print(f"  [accent]›[/accent] [link={uri}]{label}[/link]{date}")
-    except Exception:                       # no rich, or no console — plain path
-        print(f"  > {target}")
+        con.c.print(f"  {num}[accent]▶[/accent] [link={uri}]{label}[/link]{date}")
+    except Exception:                       # no rich — plain, still openable path
+        print(f"  {index or '▶'}  {target}")
 
 
 def _show_links(con, recs: list[tuple], limit: int = 8) -> None:
-    """Print the 'open a recording' block beneath an answer."""
+    """Print the playable recordings beneath an answer — numbered, clickable, and
+    with one quiet hint for terminals that don't do clickable links. No timestamps,
+    no log chrome: just the files."""
     if not recs:
         return
     con.space()
-    con.dim("open a recording (click to play):")
-    for rec, when in recs[:limit]:
-        _print_file_link(con, rec, when)
-    if len(recs) > limit:
-        con.dim(f"  …and {len(recs) - limit} more")
+    shown = recs[:limit]
+    for i, (rec, when) in enumerate(shown, 1):
+        _print_file_link(con, rec, when, index=i)
+    hint = "click a file to play — or run  reel play 1"
+    try:
+        con.c.print(f"  [muted]{hint}[/muted]")
+    except Exception:
+        print(f"  ({hint})")
 
 
 def run_ask(cfg: Config, con, question: str | None = None) -> None:
@@ -334,15 +408,14 @@ def run_ask(cfg: Config, con, question: str | None = None) -> None:
         return
 
     clean, stems = _split_answer(answer)
+    clean = _strip_markdown(clean)
 
+    # The answer, plain — nothing before it, no log line after it.
     con.space()
     con.type_out(clean)
-    con.space()
-    tail = f"— from {n} of your {total} recordings" if truncated else f"— from all {total} of your recordings"
-    con.dim(f"{tail}, on your machine")
 
-    # Turn the recordings Claude named into clickable links. If it named none, fall
-    # back to fast keyword hits so there's still something to click.
+    # Turn the recordings Claude named into clickable, playable links. If it named
+    # none, fall back to fast keyword hits so there's still something to play.
     by_stem = {rec.stem: (rec, when) for when, _s, rec, _t in items}
     recs: list[tuple] = []
     seen = set()
@@ -356,4 +429,37 @@ def run_ask(cfg: Config, con, question: str | None = None) -> None:
             if h.recording not in seen:
                 recs.append((h.recording, _recorded_at(h.recording.stem)))
                 seen.add(h.recording)
+    _save_last(cfg, [rec for rec, _w in recs])
     _show_links(con, recs)
+
+
+def run_play(cfg: Config, con, which=None) -> None:
+    """`reel play [N]` — play a recording from your most recent `reel find`,
+    in the system's default media player. N is its number in that list (default 1).
+    A guaranteed way to play even where the terminal can't open clickable links."""
+    store = _last_find_path(cfg)
+    paths: list[Path] = []
+    if store.exists():
+        try:
+            paths = [Path(p) for p in json.loads(store.read_text(encoding="utf-8"))]
+        except Exception:
+            paths = []
+    if not paths:
+        con.warn("nothing to play yet — search first, e.g.  reel find my last recording")
+        return
+    try:
+        n = int(which) if which not in (None, "") else 1
+    except (TypeError, ValueError):
+        con.warn(f"which one? give a number 1–{len(paths)}, e.g.  reel play 1")
+        return
+    if n < 1 or n > len(paths):
+        con.warn(f"there are {len(paths)} to choose from — pick 1 to {len(paths)}.")
+        return
+    target = paths[n - 1]
+    if not target.exists():
+        con.warn(f"that recording isn't here anymore: {target.name}")
+        return
+    if _open_media(target):
+        con.ok(f"playing {target.name}")
+    else:
+        con.warn(f"couldn't open it — it's here: {target}")
