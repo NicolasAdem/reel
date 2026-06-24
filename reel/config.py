@@ -52,6 +52,10 @@ class Config:
     transcribe_max_minutes: float = 25.0
     transcribe_max_mb: float = 40.0
 
+    # after each copy, file recordings (and their transcripts) into
+    # <library>/<year>/<month>/ folders, months lowercase. True by default.
+    organize_by_date: bool = True
+
     @property
     def profile_path(self) -> Path:
         return self.sync_root / ".reel" / "profile.json"
@@ -107,4 +111,5 @@ def load(path: str | os.PathLike | None) -> Config:
     cfg.transcribe_only_folders = g("transcribe", "only_folders", cfg.transcribe_only_folders)
     cfg.transcribe_max_minutes = float(g("transcribe", "max_minutes", cfg.transcribe_max_minutes))
     cfg.transcribe_max_mb = float(g("transcribe", "max_mb", cfg.transcribe_max_mb))
+    cfg.organize_by_date = bool(g("organize", "by_date", cfg.organize_by_date))
     return cfg

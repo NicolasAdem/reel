@@ -143,10 +143,14 @@ def transcribe_library(cfg: Config, con) -> int:
     written = 0
     found = find_untranscribed(cfg.sync_root)
     if found:
-        # Only the recordings: files inside a recordings folder (REC_FILE, …) and
-        # not absurdly long/large. Music and sound effects are ignored.
+        # Only the recordings: files inside a recordings folder (REC_FILE, …) — or
+        # already filed under a <year>/<month> date folder — and not absurdly
+        # long/large. Music and sound effects are ignored.
+        from . import organize          # lazy: organize imports us back
         pending = [p for p in found
-                   if _in_recordings_folder(p, cfg) and not _too_big(p, cfg)]
+                   if (_in_recordings_folder(p, cfg)
+                       or organize.in_date_folder(p, cfg.sync_root))
+                   and not _too_big(p, cfg)]
         skipped = len(found) - len(pending)
         if skipped:
             con.dim(f"skipping {skipped} file(s) outside the recordings folder (music, sound effects, …)")
@@ -193,11 +197,14 @@ def retranscribe_library(cfg: Config, con) -> int:
     if not root.exists():
         con.warn("no library yet — nothing to re-transcribe.")
         return 0
+    from . import organize              # lazy: organize imports us back
     removed = 0
     for mp3 in root.rglob("*"):
         if mp3.suffix.lower() != ".mp3" or not mp3.is_file():
             continue
-        if ".reel" in mp3.parts or not _in_recordings_folder(mp3, cfg):
+        if ".reel" in mp3.parts:
+            continue
+        if not (_in_recordings_folder(mp3, cfg) or organize.in_date_folder(mp3, cfg.sync_root)):
             continue
         tp = transcript_path(mp3)
         if tp.exists():

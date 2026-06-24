@@ -317,6 +317,7 @@ class Reel:
                 ("rename  on/off", "The automatic name-tidying — on by default; off = pure 1:1 copies"),
                 ("find  <request>", "Ask about your recordings in plain English — time-aware, by meaning"),
                 ("play  [N]", "Play recording N from your last find (default 1) in your media player"),
+                ("organize", "File recordings into <year>/<month> folders (automatic after each copy)"),
             ]),
             ("Keeping it fresh", [
                 ("retranscribe", "Redo existing transcripts with the current model/settings (better accuracy)"),

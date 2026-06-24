@@ -20,6 +20,9 @@ __main__.py — the reel command line. Three commands; the rest is automatic.
                            number in that list, default 1) in your media player.
   reel retranscribe        redo the transcripts you already have with the current
                            model/settings — use after raising accuracy in config.
+  reel organize            file every recording (and its note) into
+                           <library>/<year>/<month>/ folders (months lowercase).
+                           Runs automatically after each copy; this re-scans now.
   reel upgrade             update reel to the latest version (also: reel --upgrade).
   reel --version           print the version and exit.
 
@@ -57,6 +60,7 @@ def build_parser():
     ppl = sub.add_parser("play", parents=[common])
     ppl.add_argument("which", nargs="?")
     sub.add_parser("retranscribe", parents=[common])
+    sub.add_parser("organize", parents=[common])
     sub.add_parser("upgrade", parents=[common])
     pa = sub.add_parser("auto", parents=[common])     # internal: the watcher's own entry points
     pa.add_argument("action", nargs="?", choices=["run", "session", "restart"])
@@ -138,6 +142,13 @@ def main(argv=None):
         from .transcribe import retranscribe_library
         con.logo()
         retranscribe_library(cfg, con)
+
+    elif args.cmd == "organize":
+        from .organize import organize_library
+        con.logo()
+        n = organize_library(cfg, con)
+        if not n:
+            con.info("everything's already filed by date — nothing to move.")
 
     elif args.cmd == "upgrade":
         con.logo()

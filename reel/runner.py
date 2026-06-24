@@ -147,6 +147,14 @@ def sync_devices(cfg: Config, con) -> list[mirror.MirrorSummary]:
     except Exception as e:
         con.err(f"transcripts skipped: {e}")
 
+    # …then file every recording (and its transcript) under <year>/<month>. Guarded
+    # the same way — date-filing must never be able to break a copy.
+    try:
+        from . import organize
+        organize.organize_library(cfg, con)
+    except Exception as e:
+        con.err(f"date-filing skipped: {e}")
+
     return results
 
 
