@@ -19,10 +19,28 @@ def _ps_lit(s: str, limit: int) -> str:
     return s[:limit].replace("'", "''")
 
 
+def _toast_unix(title: str, message: str) -> bool:
+    """A desktop notification on Linux (notify-send) or macOS (osascript). Silent
+    no-op if the tool isn't there — a notification must never break a sync. On
+    Linux this matters more: there's no pop-up window, so it's the only feedback."""
+    import shutil
+    try:
+        if sys.platform == "darwin":
+            script = f'display notification "{message[:180]}" with title "{title[:60]}"'
+            return subprocess.run(["osascript", "-e", script],
+                                  capture_output=True, timeout=10).returncode == 0
+        if shutil.which("notify-send"):
+            return subprocess.run(["notify-send", "-a", "reel", title[:60], message[:180]],
+                                  capture_output=True, timeout=10).returncode == 0
+    except Exception:
+        return False
+    return False
+
+
 def toast(title: str, message: str) -> bool:
     """Show a toast. Returns True if the OS accepted it; never raises."""
     if sys.platform != "win32":
-        return False
+        return _toast_unix(title, message)
     t = _ps_lit(title, 60)
     m = _ps_lit(message, 180)
     script = (

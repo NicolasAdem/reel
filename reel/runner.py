@@ -137,6 +137,16 @@ def sync_devices(cfg: Config, con) -> list[mirror.MirrorSummary]:
         _mirror_summary(cfg, con, s)
         con.space()
         results.append(s)
+
+    # End of the copy: turn any new recordings into text, right next to them.
+    # Fully local, incremental (only files without a transcript yet), and never
+    # allowed to break a copy — so we guard the whole thing.
+    try:
+        from . import transcribe
+        transcribe.transcribe_library(cfg, con)
+    except Exception as e:
+        con.err(f"transcripts skipped: {e}")
+
     return results
 
 
@@ -193,11 +203,26 @@ def _announce(con, dev, kind: str) -> None:
     con.info(f"{glyph}  {label} '{dev.display}' — copying everything over…")
 
 
+def _gb(n: int) -> str:
+    """Bytes as a friendly size, e.g. '912.4 GB' or '184.0 MB'."""
+    mb = n / (1024 * 1024)
+    return f"{mb/1024:.1f} GB" if mb >= 1024 else f"{mb:.0f} MB"
+
+
 def _mirror_summary(cfg: Config, con, s: mirror.MirrorSummary) -> None:
     """Report a copy pass: what was copied, what was renamed, where it landed,
     and — plainly — anything that couldn't be read, so no loss is ever silent."""
     if not s.devices:
         con.warn("no device found — plug something in.")
+        return
+    # Refused for lack of room — nothing was copied, on purpose.
+    if s.aborted:
+        where = Path(s.mirror_root).name
+        con.err(f"not enough room for '{where}' — it needs about {_gb(s.need_bytes)}, "
+                f"but only {_gb(s.free_bytes)} is free where your reel library lives.")
+        con.dim("nothing was copied. free up space, or move your reel folder to a "
+                "bigger disk — reel will follow it. (you can also point it elsewhere "
+                "in config.toml.)")
         return
     where = Path(s.mirror_root).name
     if s.copied == 0 and s.relocated == 0 and s.skipped:

@@ -1,2 +1,0 @@
-[console_scripts]
-reel = reel.__main__:main

@@ -19,3 +19,15 @@ close_on_unplug = true                       # close the pop-up window when you 
 
 [ui]
 theme = "light"                              # "light" (default) or "dark"
+
+[transcribe]
+# After each copy, turn new MP3s into text saved next to them as
+# '<name>-transcript.txt'. Fully local — needs the add-on:  pip install faster-whisper
+enabled = true
+model = "base"                               # tiny|base|small|medium|large — bigger = better & slower
+# language = "en"                            # leave unset to auto-detect
+# ONLY transcribe files inside one of these folders (the recorder's recordings tree).
+# Everything else — MUSIC, SOUND EFFECTS, … — is ignored. [] = transcribe everywhere.
+only_folders = ["REC_FILE", "RECORDINGS", "VOICE RECORDINGS", "VOICE", "VOICE MEMOS"]
+max_minutes = 25                             # belt-and-braces: skip files longer than this. 0 = no limit
+max_mb = 40                                  # …or larger than this. 0 = no limit

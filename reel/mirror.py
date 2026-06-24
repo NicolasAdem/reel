@@ -87,6 +87,9 @@ class MirrorSummary:
     by_category: dict = field(default_factory=dict)  # by file-kind — for the summary
     mirror_root: str = ""
     device_id: str = ""
+    aborted: bool = False     # refused before copying (e.g. not enough free space)
+    need_bytes: int = 0       # bytes this copy would have needed
+    free_bytes: int = 0       # bytes free where the library lives
 
 
 # ── the rename toggle ────────────────────────────────────────────────────────
@@ -229,6 +232,42 @@ def _find_relocated(src: Path, size: int, vanished: dict, mirror_root: Path,
     return None
 
 
+# ── disk-space pre-flight ────────────────────────────────────────────────────
+# Always leave a little headroom so the destination never fills to the brim.
+_SPACE_MARGIN = 64 * 1024 * 1024   # 64 MB
+
+
+def _free_space(path: Path) -> int:
+    """Bytes free on the disk that holds `path` — walking up to the first folder
+    that actually exists (the library, or its parent, may not be created yet)."""
+    p = Path(path)
+    while not p.exists() and p != p.parent:
+        p = p.parent
+    try:
+        return shutil.disk_usage(str(p)).free
+    except OSError:
+        return 0
+
+
+def _bytes_needed(files, files_seen: dict, mirror_root: Path) -> int:
+    """How many bytes this copy would actually write: the size of every file that
+    isn't already sitting in the library unchanged. A conservative estimate (it
+    doesn't try to predict the rare move/rename shortcut), so it errs toward
+    warning rather than overfilling the disk."""
+    need = 0
+    for src, rel in files:
+        try:
+            size = src.stat().st_size
+        except OSError:
+            continue
+        prev = files_seen.get(rel)
+        if (prev and prev.get("size") == size
+                and (mirror_root / prev.get("final", rel)).exists()):
+            continue   # already copied and still here — no new space needed
+        need += size
+    return need
+
+
 # ── the two-phase copy ───────────────────────────────────────────────────────
 def mirror_device(cfg: Config, dev: device.Device, *,
                   on_scan_done=None, on_copy=None, on_copy_done=None,
@@ -251,6 +290,17 @@ def mirror_device(cfg: Config, dev: device.Device, *,
     files_seen: dict = manifest.setdefault("files", {})
 
     dirs, files = _walk(dev.root, s.errors)
+
+    # Disk-space pre-flight: never start a copy that can't fit. Catches the classic
+    # "900 GB drive → a library with 200 GB free" before a single byte is written.
+    need = _bytes_needed(files, files_seen, mirror_root)
+    free = _free_space(cfg.sync_root)
+    if need + _SPACE_MARGIN > free:
+        s.aborted = True
+        s.need_bytes = need
+        s.free_bytes = free
+        return s
+
     if on_scan_done:
         on_scan_done(len(files))
 

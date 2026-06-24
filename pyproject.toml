@@ -10,12 +10,16 @@ dynamic = ["version"]          # single-sourced from reel/__init__.py
 description = "Plug in any USB drive, SD card or voice recorder — it's copied to your PC. Fully local, always on."
 readme = "README.md"
 requires-python = ">=3.9"
-license = "MIT"
 authors = [{ name = "Nicolas" }]
 keywords = ["usb", "backup", "copy", "sd-card", "voice-recorder", "icd-ux570", "sync"]
+# Use the classic license classifier (not the SPDX `license = "MIT"` string): that
+# keeps the wheel at Metadata-Version <=2.3, which every PyPI/twine combo accepts.
+# The SPDX form emits Metadata-Version 2.4, which trips a 400 on some toolchains.
+classifiers = ["License :: OSI Approved :: MIT License"]
 dependencies = [
     "rich>=13.0",
     "mutagen>=1.47",
+    "faster-whisper>=1.0",   # local speech-to-text for the after-copy transcripts
     "tomli>=2.0; python_version < '3.11'",
 ]
 

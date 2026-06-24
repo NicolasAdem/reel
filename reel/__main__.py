@@ -9,6 +9,12 @@ __main__.py — the reel command line. Three commands; the rest is automatic.
                            original layout (original folders, original names).
   reel rename [on|off]     the automatic name-tidying. On by default; turn it
                            off for a pure 1:1 copy. The copy itself never changes.
+  reel find <request>      ask about your recordings in plain English — reel reads
+                           the transcripts and answers, aware of time and meaning:
+                             reel find a summary of today's notes
+                             reel find what was my first recording about?
+                             reel find the interview at Bucky's about a month ago
+                           Uses Claude Code if installed; no words → it prompts you.
   reel upgrade             update reel to the latest version (also: reel --upgrade).
   reel --version           print the version and exit.
 
@@ -41,6 +47,8 @@ def build_parser():
     pt.add_argument("name", nargs="?")
     pr = sub.add_parser("rename", parents=[common])
     pr.add_argument("state", nargs="?", choices=["on", "off"])
+    pf = sub.add_parser("find", parents=[common])
+    pf.add_argument("query", nargs="*")
     sub.add_parser("upgrade", parents=[common])
     pa = sub.add_parser("auto", parents=[common])     # internal: the watcher's own entry points
     pa.add_argument("action", nargs="?", choices=["run", "session", "restart"])
@@ -106,6 +114,12 @@ def main(argv=None):
             con.info(f"renaming is {'ON' if on else 'OFF'}.")
             con.dim("  reel rename off   → pure 1:1 copies, names untouched")
             con.dim("  reel rename on    → tidy, sortable names (the default)")
+
+    elif args.cmd == "find":
+        # Ask about your recordings in plain English (time-aware, by meaning).
+        # No words → it prompts you. Falls back to keyword search if Claude is away.
+        from .ask import run_ask
+        run_ask(cfg, con, " ".join(getattr(args, "query", []) or []).strip() or None)
 
     elif args.cmd == "upgrade":
         con.logo()

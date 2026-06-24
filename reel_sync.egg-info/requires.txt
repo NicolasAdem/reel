@@ -1,5 +1,0 @@
-rich>=13.0
-mutagen>=1.47
-
-[:python_version < "3.11"]
-tomli>=2.0

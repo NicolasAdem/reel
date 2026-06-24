@@ -207,6 +207,35 @@ class Reel:
             return self.c.status(f"[accent]{message}[/accent]", spinner="dots")
         return _DummyStatus()
 
+    def type_out(self, text: str, cps: int = 160) -> None:
+        """Print `text` with a gentle typing animation — character by character,
+        like it's being written out. Falls back to a plain print when there's no
+        real terminal, or when the text is long enough that animating would just
+        be tedious. Plain text only (no markup), since it's a model's answer."""
+        import sys
+        import time
+        text = (text or "").rstrip()
+        if not text:
+            return
+        # Make the text safe for this terminal's encoding up front — a Windows
+        # console is often cp1252, and a model's answer can carry emoji or other
+        # characters it can't encode. Without this, writing one would crash.
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+        text = text.encode(enc, "replace").decode(enc, "replace")
+        if not sys.stdout.isatty() or len(text) > 4000 or cps <= 0:
+            print(text)
+            return
+        delay = 1.0 / cps
+        try:
+            for ch in text:
+                sys.stdout.write(ch)
+                sys.stdout.flush()
+                time.sleep(delay)
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+        except Exception:
+            print(text)
+
     def ask_name(self, sidekick_word: str = "sidekick") -> str:
         """Prompt the user to name their reel. Enter keeps the default."""
         if _RICH:
@@ -286,6 +315,7 @@ class Reel:
                 ("setup", "Run once. reel installs itself and copies every drive you plug in — forever"),
                 ("transfer  [name]", "Put a copied drive back onto a blank stick (original folders & names)"),
                 ("rename  on/off", "The automatic name-tidying — on by default; off = pure 1:1 copies"),
+                ("find  <request>", "Ask about your recordings in plain English — time-aware, by meaning"),
             ]),
             ("Keeping it fresh", [
                 ("upgrade", "Update reel to the latest version (also: reel --upgrade)"),

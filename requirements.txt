@@ -1,4 +1,5 @@
 # Reel — plug it in, copied. Install:  pip install -r requirements.txt
 rich>=13.0          # terminal styling + progress bar (optional but nice)
 mutagen>=1.47       # read audio dates/tags for the name-tidying; pure-Python
+faster-whisper>=1.0 # local speech-to-text for the after-copy transcripts
 tomli>=2.0 ; python_version < "3.11"

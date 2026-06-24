@@ -99,23 +99,44 @@ def is_paused(cfg: Config) -> bool:
     return _pause_path(cfg).exists()
 
 
+# Linux/other: an XDG autostart entry (~/.config/autostart/reel.desktop) is the
+# cross-desktop way to "start me at login", the counterpart to the Windows .vbs.
+def _xdg_autostart_path() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "autostart" / "reel.desktop"
+
+
 # ── install / uninstall the at-login launcher ────────────────────────────────
 def install(startup: Path | None = None) -> Path:
-    """Drop a hidden launcher into the Startup folder so reel watches from login.
-    A .vbs (window style 0) starts pythonw with no flash and no console at all."""
-    path = _launcher_path(startup)
+    """Make reel start watching at every login. On Windows that's a hidden .vbs in
+    the Startup folder (pythonw, no console flash); on Linux/other it's an XDG
+    autostart .desktop entry. Idempotent — safe to call again any time."""
+    if sys.platform == "win32":
+        path = _launcher_path(startup)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _remove_legacy(path.parent)              # drop any old capitalised launcher
+        cmd = f'""{_pythonw()}"" -m reel auto run'   # "" → " once inside the VBS string
+        path.write_text(
+            "' reel — copies any drive at login (hidden). Delete this file to disable.\r\n"
+            f'CreateObject("WScript.Shell").Run "{cmd}", 0, False\r\n',
+            encoding="utf-8")
+        return path
+    path = _xdg_autostart_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    _remove_legacy(path.parent)              # drop any old capitalised launcher
-    cmd = f'""{_pythonw()}"" -m reel auto run'   # "" → " once inside the VBS string
     path.write_text(
-        "' reel — copies any drive at login (hidden). Delete this file to disable.\r\n"
-        f'CreateObject("WScript.Shell").Run "{cmd}", 0, False\r\n',
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=reel\n"
+        "Comment=reel — copies any drive you plug in\n"
+        f'Exec="{sys.executable}" -m reel auto run\n'
+        "X-GNOME-Autostart-enabled=true\n"
+        "NoDisplay=true\n",
         encoding="utf-8")
     return path
 
 
 def uninstall(startup: Path | None = None) -> bool:
-    path = _launcher_path(startup)
+    path = _launcher_path(startup) if sys.platform == "win32" else _xdg_autostart_path()
     if path.exists():
         path.unlink()
         return True
@@ -123,7 +144,8 @@ def uninstall(startup: Path | None = None) -> bool:
 
 
 def is_installed(startup: Path | None = None) -> bool:
-    return _launcher_path(startup).exists()
+    path = _launcher_path(startup) if sys.platform == "win32" else _xdg_autostart_path()
+    return path.exists()
 
 
 # ── start / stop the running watcher ─────────────────────────────────────────

@@ -30,6 +30,23 @@ class Config:
     # terminal theme: "light" (default) or "dark"
     theme: str = "light"
 
+    # transcripts: after each copy, turn new MP3s into text next to them
+    # (fully local, via faster-whisper). "base" balances speed and accuracy;
+    # language None = auto-detect.
+    transcribe_enabled: bool = True
+    transcribe_model: str = "base"
+    transcribe_language: str | None = None
+    # ONLY transcribe files that live in (or under) a recordings folder — matched by
+    # name anywhere in the path, case-insensitive. On a Sony IC recorder that's
+    # 'REC_FILE'; the rest covers other devices. Everything else (MUSIC, SOUND
+    # EFFECTS, …) is ignored. Empty list = transcribe everywhere.
+    transcribe_only_folders: list[str] = field(default_factory=lambda: [
+        "REC_FILE", "RECORDINGS", "VOICE RECORDINGS", "VOICE", "VOICE MEMOS"])
+    # belt-and-braces cap: even inside a recordings folder, skip anything absurdly
+    # long or large (it isn't a voice memo). 0 = no cap on that dimension.
+    transcribe_max_minutes: float = 25.0
+    transcribe_max_mb: float = 40.0
+
     @property
     def profile_path(self) -> Path:
         return self.sync_root / ".reel" / "profile.json"
@@ -78,4 +95,10 @@ def load(path: str | os.PathLike | None) -> Config:
     cfg.watch_interval_sec = int(g("watch", "interval_sec", cfg.watch_interval_sec))
     cfg.close_on_unplug = bool(g("watch", "close_on_unplug", cfg.close_on_unplug))
     cfg.theme = g("ui", "theme", cfg.theme)
+    cfg.transcribe_enabled = bool(g("transcribe", "enabled", cfg.transcribe_enabled))
+    cfg.transcribe_model = g("transcribe", "model", cfg.transcribe_model)
+    cfg.transcribe_language = g("transcribe", "language", cfg.transcribe_language)
+    cfg.transcribe_only_folders = g("transcribe", "only_folders", cfg.transcribe_only_folders)
+    cfg.transcribe_max_minutes = float(g("transcribe", "max_minutes", cfg.transcribe_max_minutes))
+    cfg.transcribe_max_mb = float(g("transcribe", "max_mb", cfg.transcribe_max_mb))
     return cfg

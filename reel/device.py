@@ -128,14 +128,40 @@ def _candidate_volumes() -> list[tuple[Path, str, str, bool]]:
                 continue  # never touch optical drives
             label, serial = _windows_volume_info(root)
             out.append((root, label, serial, dtype == _DRIVE_REMOVABLE))
+    elif sys.platform == "darwin":
+        base = Path("/Volumes")
+        if base.exists():
+            for child in base.iterdir():
+                # skip the boot volume (a symlink to /)
+                if child.is_dir() and not child.is_symlink():
+                    out.append((child, child.name, "", True))
     else:
-        bases = [Path("/Volumes")] if sys.platform == "darwin" else [Path("/media"), Path("/mnt")]
+        # Linux & other unixes: removable drives auto-mount one level under the
+        # desktop mount roots. Each *child* is a mounted volume (its folder name is
+        # the label); manual mounts live under /mnt. We look exactly one level deep
+        # (not recursively) and only count real mount points, so stray empty
+        # placeholder folders are ignored.
+        user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+        bases = [Path("/media") / user, Path("/run/media") / user,
+                 Path("/media"), Path("/mnt")]
+        seen: set[str] = set()
         for base in bases:
             if not base.exists():
                 continue
-            for child in base.glob("**/"):
-                if child.is_dir() and child != base:
-                    out.append((child, child.name, "", True))
+            try:
+                children = list(base.iterdir())
+            except OSError:
+                continue
+            for child in children:
+                key = os.path.realpath(child)
+                if key in seen:
+                    continue
+                try:
+                    if child.is_dir() and os.path.ismount(child):
+                        seen.add(key)
+                        out.append((child, child.name, "", True))
+                except OSError:
+                    continue
     return out
 
 
