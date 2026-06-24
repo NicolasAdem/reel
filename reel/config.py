@@ -31,11 +31,16 @@ class Config:
     theme: str = "light"
 
     # transcripts: after each copy, turn new MP3s into text next to them
-    # (fully local, via faster-whisper). "base" balances speed and accuracy;
-    # language None = auto-detect.
+    # (fully local, via faster-whisper). "small" is a good default; bump to
+    # "medium" or "large-v3" for noticeably better accuracy (esp. names, jargon,
+    # and non-English) at the cost of speed. language None = auto-detect.
     transcribe_enabled: bool = True
-    transcribe_model: str = "base"
+    transcribe_model: str = "small"
     transcribe_language: str | None = None
+    # optional spelling/vocabulary hint fed to the model as context — list the
+    # proper nouns and jargon it keeps getting wrong (names, places, terms) and it
+    # will spell them right far more often. None = no hint.
+    transcribe_initial_prompt: str | None = None
     # ONLY transcribe files that live in (or under) a recordings folder — matched by
     # name anywhere in the path, case-insensitive. On a Sony IC recorder that's
     # 'REC_FILE'; the rest covers other devices. Everything else (MUSIC, SOUND
@@ -98,6 +103,7 @@ def load(path: str | os.PathLike | None) -> Config:
     cfg.transcribe_enabled = bool(g("transcribe", "enabled", cfg.transcribe_enabled))
     cfg.transcribe_model = g("transcribe", "model", cfg.transcribe_model)
     cfg.transcribe_language = g("transcribe", "language", cfg.transcribe_language)
+    cfg.transcribe_initial_prompt = g("transcribe", "initial_prompt", cfg.transcribe_initial_prompt)
     cfg.transcribe_only_folders = g("transcribe", "only_folders", cfg.transcribe_only_folders)
     cfg.transcribe_max_minutes = float(g("transcribe", "max_minutes", cfg.transcribe_max_minutes))
     cfg.transcribe_max_mb = float(g("transcribe", "max_mb", cfg.transcribe_max_mb))

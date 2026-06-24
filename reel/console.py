@@ -319,6 +319,7 @@ class Reel:
                 ("play  [N]", "Play recording N from your last find (default 1) in your media player"),
             ]),
             ("Keeping it fresh", [
+                ("retranscribe", "Redo existing transcripts with the current model/settings (better accuracy)"),
                 ("upgrade", "Update reel to the latest version (also: reel --upgrade)"),
                 ("--version", "Print the installed version"),
             ]),

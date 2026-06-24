@@ -18,6 +18,8 @@ __main__.py — the reel command line. Three commands; the rest is automatic.
                            Each answer ends with clickable links — click one to play.
   reel play [N]            play a recording from your last `reel find` (N = its
                            number in that list, default 1) in your media player.
+  reel retranscribe        redo the transcripts you already have with the current
+                           model/settings — use after raising accuracy in config.
   reel upgrade             update reel to the latest version (also: reel --upgrade).
   reel --version           print the version and exit.
 
@@ -54,6 +56,7 @@ def build_parser():
     pf.add_argument("query", nargs="*")
     ppl = sub.add_parser("play", parents=[common])
     ppl.add_argument("which", nargs="?")
+    sub.add_parser("retranscribe", parents=[common])
     sub.add_parser("upgrade", parents=[common])
     pa = sub.add_parser("auto", parents=[common])     # internal: the watcher's own entry points
     pa.add_argument("action", nargs="?", choices=["run", "session", "restart"])
@@ -130,6 +133,11 @@ def main(argv=None):
         # Play a recording from the last find — no logo, just open it and go.
         from .ask import run_play
         run_play(cfg, con, getattr(args, "which", None))
+
+    elif args.cmd == "retranscribe":
+        from .transcribe import retranscribe_library
+        con.logo()
+        retranscribe_library(cfg, con)
 
     elif args.cmd == "upgrade":
         con.logo()

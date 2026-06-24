@@ -114,9 +114,23 @@ def _load_model(cfg: Config):
     return _MODEL
 
 
-def _transcribe_one(model, mp3: Path, language: str | None) -> str:
-    """Listen to one file and return its text (may be empty for silence)."""
-    segments, _info = model.transcribe(str(mp3), language=language or None)
+def _transcribe_one(model, mp3: Path, language: str | None,
+                    initial_prompt: str | None = None) -> str:
+    """Listen to one file and return its text (may be empty for silence).
+
+    Two quality levers beyond the model size:
+      - vad_filter trims silence before transcribing, which both speeds things up
+        and stops the model from hallucinating words into quiet gaps.
+      - initial_prompt seeds the decoder with your own vocabulary (names, places,
+        jargon) so it spells them the way you do — e.g. 'en passant', not 'amputant'.
+    """
+    segments, _info = model.transcribe(
+        str(mp3),
+        language=language or None,
+        vad_filter=True,
+        beam_size=5,
+        initial_prompt=initial_prompt or None,
+    )
     return "".join(seg.text for seg in segments).strip()
 
 
@@ -155,7 +169,8 @@ def transcribe_library(cfg: Config, con) -> int:
                     for mp3 in pending:
                         bar.update(tid, name=mp3.name)
                         try:
-                            text = _transcribe_one(model, mp3, cfg.transcribe_language)
+                            text = _transcribe_one(model, mp3, cfg.transcribe_language,
+                                                   cfg.transcribe_initial_prompt)
                             transcript_path(mp3).write_text(text + "\n", encoding="utf-8")
                             written += 1
                         except Exception as e:
@@ -167,3 +182,33 @@ def transcribe_library(cfg: Config, con) -> int:
                     con.ok(f"transcribed {written} recording(s) — text saved next to each one.")
 
     return written
+
+
+def retranscribe_library(cfg: Config, con) -> int:
+    """Re-do the transcripts you already have, with the current model and settings.
+    Use this after raising the model size or changing the vocabulary hint, to bring
+    older recordings up to the new quality. Deletes each in-scope transcript and
+    lets the normal pass rewrite it."""
+    root = Path(cfg.sync_root)
+    if not root.exists():
+        con.warn("no library yet — nothing to re-transcribe.")
+        return 0
+    removed = 0
+    for mp3 in root.rglob("*"):
+        if mp3.suffix.lower() != ".mp3" or not mp3.is_file():
+            continue
+        if ".reel" in mp3.parts or not _in_recordings_folder(mp3, cfg):
+            continue
+        tp = transcript_path(mp3)
+        if tp.exists():
+            try:
+                tp.unlink()
+                removed += 1
+            except OSError:
+                pass
+    if not removed:
+        con.info("no existing transcripts to redo — run a normal copy to make some.")
+        return 0
+    con.info(f"re-transcribing {removed} recording(s) with the '{cfg.transcribe_model}' "
+             "model — this can take a few minutes…")
+    return transcribe_library(cfg, con)
