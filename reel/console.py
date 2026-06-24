@@ -316,6 +316,7 @@ class Reel:
                 ("transfer  [name]", "Put a copied drive back onto a blank stick (original folders & names)"),
                 ("rename  on/off", "The automatic name-tidying — on by default; off = pure 1:1 copies"),
                 ("find  <request>", "Ask about your recordings in plain English — time-aware, by meaning"),
+                ("play  [N]", "Play recording N from your last find (default 1) in your media player"),
             ]),
             ("Keeping it fresh", [
                 ("upgrade", "Update reel to the latest version (also: reel --upgrade)"),
